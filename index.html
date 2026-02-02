@@ -3,47 +3,65 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Phone Tilt Demo</title>
+  <title>Tilt Tap Demo</title>
   <style>
     body { font-family: sans-serif; text-align: center; margin-top: 50px; }
-    .angle { font-size: 2em; margin: 20px 0; }
+    .status { font-size: 3em; margin-top: 50px; color: black; }
     button { padding: 10px 20px; font-size: 1em; }
   </style>
 </head>
 <body>
-  <h1>Phone Tilt Angles 🌟</h1>
+  <h1>Tilt Tap Detection 📱</h1>
   <button id="start">Allow Motion Access</button>
-  <div class="angle">Front/Back Tilt (β): <span id="beta">0</span>°</div>
-  <div class="angle">Left/Right Tilt (γ): <span id="gamma">0</span>°</div>
-  <div class="angle">Compass Rotation (α): <span id="alpha">0</span>°</div>
+  <div class="status" id="status">Waiting...</div>
 
   <script>
-    const betaEl = document.getElementById("beta");
-    const gammaEl = document.getElementById("gamma");
-    const alphaEl = document.getElementById("alpha");
+    const statusEl = document.getElementById("status");
     const btn = document.getElementById("start");
 
+    let lastTilt = { beta: 0, gamma: 0 };
+    let tapTimeout = null;
+    const TILT_THRESHOLD = 15; // degrees to count as tilt
+    const RETURN_THRESHOLD = 5; // back to original
+
     btn.addEventListener("click", () => {
-      // iOS 13+ requires explicit permission
       if (typeof DeviceOrientationEvent.requestPermission === 'function') {
         DeviceOrientationEvent.requestPermission()
         .then(permissionState => {
           if(permissionState === 'granted') {
-            window.addEventListener('deviceorientation', handleOrientation);
+            window.addEventListener('deviceorientation', detectTap);
           } else {
             alert("Permission denied 😢");
           }
         }).catch(console.error);
       } else {
-        // Android or older iOS
-        window.addEventListener('deviceorientation', handleOrientation);
+        window.addEventListener('deviceorientation', detectTap);
       }
     });
 
-    function handleOrientation(event) {
-      betaEl.textContent = event.beta.toFixed(1);   // front/back tilt
-      gammaEl.textContent = event.gamma.toFixed(1); // left/right tilt
-      alphaEl.textContent = event.alpha.toFixed(1); // compass rotation
+    function detectTap(event) {
+      const beta = event.beta;   // front/back tilt
+      const gamma = event.gamma; // left/right tilt
+
+      // check if phone tilted enough from original position
+      if (!tapTimeout && Math.abs(beta - lastTilt.beta) > TILT_THRESHOLD && Math.abs(gamma - lastTilt.gamma) > TILT_THRESHOLD) {
+        // tilt detected, now wait for return
+        tapTimeout = setTimeout(() => { tapTimeout = null; }, 500); // 0.5s window
+      }
+
+      // check if returned to near original position within the time window
+      if (tapTimeout && Math.abs(beta - lastTilt.beta) < RETURN_THRESHOLD && Math.abs(gamma - lastTilt.gamma) < RETURN_THRESHOLD) {
+        statusEl.textContent = "TAP ✅";
+        statusEl.style.color = "green";
+        clearTimeout(tapTimeout);
+        tapTimeout = null;
+
+        // reset after 1s
+        setTimeout(() => {
+          statusEl.textContent = "Waiting...";
+          statusEl.style.color = "black";
+        }, 1000);
+      }
     }
   </script>
 </body>
